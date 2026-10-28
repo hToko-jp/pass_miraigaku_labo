@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>パスワード解析ラボ - 未来学-情報セキュリティ授業用ver1.0</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background-image:
+        radial-gradient(ellipse at 50% -20%, rgba(16, 185, 129, 0.12), transparent 55%),
+        linear-gradient(rgba(16, 185, 129, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 185, 129, 0.035) 1px, transparent 1px);
+      background-size: auto, 32px 32px, 32px 32px;
+      background-attachment: fixed;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes terminalBlink {
+      50% { opacity: 0; }
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .terminal-window {
+      background-image: linear-gradient(145deg, rgba(16, 185, 129, 0.045), transparent 45%);
+      box-shadow: inset 0 0 35px rgba(16, 185, 129, 0.035), 0 0 24px rgba(16, 185, 129, 0.07);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .terminal-window::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(transparent 0 3px, rgba(16, 185, 129, 0.025) 4px);
+      opacity: 0.55;
+    }
+
+    .terminal-window > * {
+      position: relative;
+    }
+
+    .terminal-cursor::after {
+      content: "▋";
+      margin-left: 0.35rem;
+      color: #34d399;
+      animation: terminalBlink 1s steps(2, start) infinite;
+    }
+
+    #terminalLogs {
+      scrollbar-color: #166534 #020617;
+      scrollbar-width: thin;
+      text-shadow: 0 0 8px rgba(52, 211, 153, 0.22);
+    }
+
+    #terminalProgressBar {
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.65);
+      transition: width 180ms ease-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans p-3 sm:p-6 md:p-8 select-none min-h-screen">
+
+  <div class="max-w-4xl mx-auto space-y-6">
+
+    <!-- ヘッダーエリア -->
+    <header class="bg-slate-800/90 backdrop-blur border border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+      <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center space-x-3 text-center sm:text-left">
+          <div class="p-3 bg-indigo-600/30 border border-indigo-500/50 rounded-xl text-indigo-400">
+            <i data-lucide="shield" class="w-8 h-8 sm:w-10 sm:h-10 animate-pulse"></i>
+          </div>
+          <div>
+              <div class="inline-block px-2.5 py-0.5 bg-emerald-500/10 text-emerald-300 text-xs rounded-full font-bold mb-1 border border-emerald-500/30">
+              未来学-情報セキュリティ授業用ver1.0
+            </div>
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-wide">
+              パスワード解析ラボ
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+              生年月日や名前を使ったパスワードの危険性を実験してみよう！
+            </p>
+          </div>
+        </div>
+
+        <!-- サウンド切り替えボタン -->
+        <button
+          id="soundToggleBtn"
+          class="flex items-center space-x-2 px-3 py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-600 transition"
+          title="効果音のオン/オフ"
+        >
+          <i id="soundIcon" data-lucide="volume-2" class="w-4 h-4 text-emerald-400"></i>
+          <span id="soundText">効果音 ON</span>
+        </button>
+      </div>
+
+      <!-- ナビゲーションタブ -->
+      <nav class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-6">
+        <button
+          id="tabBtnDemo"
+          onclick="switchTab('demo')"
+          class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg shadow-red-900/30 ring-2 ring-red-400"
+        >
+          <i data-lucide="zap" class="w-4 h-4"></i>
+          <span>① ハッキング実験</span>
+        </button>
+
+        <button
+          id="tabBtnChecker"
+          onclick="switchTab('checker')"
+          class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700"
+        >
+          <i data-lucide="key" class="w-4 h-4"></i>
+          <span>② 安全度測定器</span>
+        </button>
+
+        <button
+          id="tabBtnQuiz"
+          onclick="switchTab('quiz')"
+          class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700"
+        >
+          <i data-lucide="help-circle" class="w-4 h-4"></i>
+          <span>③ 安全クイズ</span>
+        </button>
+
+        <button
+          id="tabBtnSummary"
+          onclick="switchTab('summary')"
+          class="flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700"
+        >
+          <i data-lucide="book-open" class="w-4 h-4"></i>
+          <span>④ 授業のまとめ</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- ================= TAB 1: ハッキング実験 ================= -->
+    <section id="tabDemo" class="space-y-6">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg">
+        <div class="flex items-center space-x-2 mb-4">
+          <i data-lucide="shield-alert" class="w-6 h-6 text-red-400"></i>
+          <h2 class="text-lg sm:text-xl font-bold text-white">
+            生年月日・苗字・名前を使ったパスワードの実験
+          </h2>
+        </div>
+
+        <p class="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+          💡 <span class="font-bold text-amber-300">実験のやり方：</span> 苗字・名前・生年月日を入力し、<span class="text-indigo-300 font-bold">5つのパーツを自由に並べ替えたり追加・削除</span>してオリジナルの組み合わせを作ってみよう！
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- 左側: 設定フォーム -->
+          <div class="space-y-4 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">① 苗字（ローマ字）</label>
+                <input
+                  type="text"
+                  id="inputLastName"
+                  value="yamada"
+                  placeholder="例: yamada"
+                  class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">① 名前（ローマ字）</label>
+                <input
+                  type="text"
+                  id="inputFirstName"
+                  value="taro"
+                  placeholder="例: taro"
+                  class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">② 生まれ年</label>
+                <select id="selectBirthYear" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <!-- JSで生成 -->
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">③ 誕生月</label>
+                <select id="selectBirthMonth" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <!-- JSで生成 -->
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">④ 誕生日</label>
+                <select id="selectBirthDay" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <!-- JSで生成 -->
+                </select>
+              </div>
+            </div>
+
+            <!-- 5要素の自由並び替えビルダー -->
+            <div class="space-y-2 border-t border-slate-800 pt-3">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold text-amber-300">
+                  ⑤ パスワードの並び順（自由に組み替え）
+                </label>
+                <span class="text-[10px] text-slate-400">矢印で移動・✕で削除</span>
+              </div>
+
+              <!-- 現在の並び順ブロック容器 -->
+              <div id="sequenceContainer" class="flex flex-wrap gap-1.5 min-h-[44px] p-2 bg-slate-950 rounded-lg border border-slate-700 items-center">
+                <!-- JSで動的レンダリング -->
+              </div>
+
+              <!-- 未使用パーツの追加ボタン容器 -->
+              <div class="flex flex-wrap gap-1 pt-1">
+                <span class="text-[11px] text-slate-400 block w-full">追加できるパーツ：</span>
+                <div id="unusedBlocksContainer" class="flex flex-wrap gap-1"></div>
+              </div>
+
+              <!-- クイックプリセット -->
+              <div class="pt-2">
+                <span class="text-[10px] text-slate-400 block mb-1">⚡ クイック選択（ワンタップ設定）:</span>
+                <div class="grid grid-cols-2 gap-1 text-[11px]">
+                  <button onclick="setPreset(['lastName', 'firstName', 'birthMonth', 'birthDay'])" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-700 text-left truncate">
+                    苗字＋名前＋月日
+                  </button>
+                  <button onclick="setPreset(['firstName', 'lastName', 'birthMonth', 'birthDay'])" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-700 text-left truncate">
+                    名前＋苗字＋月日
+                  </button>
+                  <button onclick="setPreset(['birthDay', 'birthMonth', 'birthYear', 'firstName', 'lastName'])" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-700 text-left truncate">
+                    日＋月＋年＋名前＋苗字
+                  </button>
+                  <button onclick="setPreset(['firstName', 'birthYear'])" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-700 text-left truncate">
+                    名前＋生まれ年
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-1">
+              <div class="bg-red-950/40 border border-red-500/30 rounded-xl p-2.5 text-center">
+                <span class="text-[11px] text-red-300 font-bold">実験ターゲットのパスワード:</span>
+                <div id="targetPassDisplay" class="text-lg font-mono font-bold text-red-400 tracking-wider mt-0.5 break-all">
+                  yamadataro0512
+                </div>
+              </div>
+            </div>
+
+            <button
+              id="startHackBtn"
+              onclick="startHackingExperiment()"
+              class="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-red-900/40 flex items-center justify-center space-x-2 text-sm transition transform active:scale-95 disabled:opacity-50"
+            >
+              <i data-lucide="terminal" class="w-5 h-5"></i>
+              <span id="startHackBtnText">解析シミュレーションを開始</span>
+            </button>
+          </div>
+
+          <!-- 右側: ターミナルアニメーション & 結果表示 -->
+          <div class="flex flex-col h-full space-y-4">
+            <div class="terminal-window bg-slate-950 border border-emerald-900/70 rounded-xl p-4 font-mono text-xs text-emerald-400 flex-1 min-h-[220px] flex flex-col justify-between shadow-inner">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-slate-500 text-[10px]">
+                <div class="flex items-center space-x-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>
+                  <span class="ml-2 font-sans font-bold text-slate-400">パスワード解析シミュレーション</span>
+                </div>
+                <span id="terminalStatus" class="terminal-cursor">SIMULATION: READY</span>
+              </div>
+
+              <div id="terminalLogs" class="space-y-1 overflow-y-auto max-h-[180px]">
+                <p class="text-slate-500">// シミュレーション準備完了</p>
+                <p class="text-slate-500">// 入力した情報を使った候補を順番に表示します</p>
+                <p class="text-center text-slate-600 py-8" id="terminalPlaceholder">
+                  「解析シミュレーションを開始」ボタンを押すと実験がスタートします。
+                </p>
+              </div>
+              <div class="mt-3 pt-2 border-t border-slate-800">
+                <div class="flex justify-between text-[10px] text-slate-500 mb-1">
+                  <span id="terminalProgressText">待機中</span>
+                  <span id="terminalProgressPercent">0%</span>
+                </div>
+                <div class="h-1.5 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+                  <div id="terminalProgressBar" class="h-full w-0 bg-gradient-to-r from-emerald-700 via-emerald-400 to-cyan-300 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 解析結果カード（初期状態は非表示） -->
+            <div id="hackResultCard" class="hidden bg-red-950/80 border-2 border-red-500 rounded-xl p-4 text-slate-100 shadow-xl space-y-3 animate-fade-in">
+              <div class="flex items-center justify-between border-b border-red-800/80 pb-2">
+                <div class="flex items-center space-x-2 text-red-400 font-bold text-sm">
+                  <i data-lucide="x-circle" class="w-5 h-5 text-red-500"></i>
+                  <span>💥 疑似解析成功（弱いパスワードの例）</span>
+                </div>
+                <span class="text-xs bg-red-900 text-red-200 px-2 py-0.5 rounded font-mono font-bold">
+                  危険度 100%
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-red-900/40 p-2 rounded border border-red-800/50">
+                  <span class="text-slate-400 block text-[10px]">シミュレーション演出時間（実測時間ではありません）</span>
+                  <span id="resultDemoTime" class="text-amber-300 font-bold text-sm">実行後に表示</span>
+                </div>
+                <div class="bg-red-900/40 p-2 rounded border border-red-800/50">
+                  <span class="text-slate-400 block text-[10px]">演出用カウンター（実際の試行数ではありません）</span>
+                  <span id="resultAttempts" class="text-amber-300 font-bold text-sm">候補を確認中</span>
+                </div>
+              </div>
+
+              <p id="resultReason" class="text-xs text-red-200 leading-relaxed bg-red-900/30 p-2.5 rounded border border-red-800/40">
+                【なぜ一瞬で破られるの？】<br />
+                どんな順番で自由に並べ替えても、コンピューターはパーツの全順列（並び替えパターン）を一瞬で計算して同時に試すため、順番を変えるだけでは一瞬で見破られてしまいます！
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: 安全度測定器 ================= -->
+    <section id="tabChecker" class="hidden space-y-6">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="key" class="w-6 h-6 text-indigo-400"></i>
+            <h2 class="text-lg sm:text-xl font-bold text-white">
+              オリジナルパスワードの安全度測定器
+            </h2>
+          </div>
+          <button
+            onclick="generateStrongPassword()"
+            class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs rounded-lg font-bold transition flex items-center space-x-1"
+          >
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+            <span>👑 安全なパスワードを自動生成</span>
+          </button>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300">
+            試してみたいパスワードを入力してみよう（例: Choco!2026Ramen）
+          </label>
+          <div class="relative">
+            <input
+              type="text"
+              id="customPasswordInput"
+              placeholder="ここにパスワードを入力..."
+              oninput="updateStrengthMeter()"
+              class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-base text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12"
+            />
+            <button
+              onclick="togglePassVisibility()"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+              title="表示/非表示"
+            >
+              <i id="eyeIcon" data-lucide="eye" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 測定結果表示エリア -->
+        <div id="strengthResultArea" class="hidden space-y-4 pt-2">
+          <!-- 強度ゲージ -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center text-xs font-bold">
+              <span class="text-slate-300">安全度のメーター</span>
+              <span id="strengthLevelText" class="text-slate-400">レベル 0 / 6</span>
+            </div>
+            <div class="w-full bg-slate-900 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-700">
+              <div id="strengthBar" class="h-full rounded-full transition-all duration-500 bg-slate-700 w-0"></div>
+            </div>
+          </div>
+
+          <!-- 解読予想時間カード -->
+          <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="space-y-1 text-center sm:text-left">
+              <span class="text-xs text-slate-400 font-bold block">
+                コンピューターが解読（パスワード破り）にかかる時間：
+              </span>
+              <div id="crackTimeDisplay" class="text-xl sm:text-2xl font-extrabold text-slate-200">
+                入力してください
+              </div>
+            </div>
+            <div id="analogyBadge" class="px-3 py-2 rounded-lg border text-xs font-bold text-center bg-slate-800 text-slate-400">
+              安全度を計測します。
+            </div>
+          </div>
+
+          <!-- アドバイスカード -->
+          <div class="bg-slate-900/50 border border-slate-700/60 rounded-xl p-4 space-y-2">
+            <h4 class="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+              <span>診断とアドバイス</span>
+            </h4>
+            <p id="strengthDesc" class="text-xs text-slate-300 leading-relaxed">
+              パスワードを入力してみよう
+            </p>
+
+            <!-- 要素チェックリスト -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800">
+              <div id="checkLen" class="text-[11px] p-2 rounded text-center border bg-slate-800 border-slate-700 text-slate-400">
+                ✗ 12文字以上
+              </div>
+              <div id="checkCase" class="text-[11px] p-2 rounded text-center border bg-slate-800 border-slate-700 text-slate-400">
+                ✗ 大文字＋小文字
+              </div>
+              <div id="checkNum" class="text-[11px] p-2 rounded text-center border bg-slate-800 border-slate-700 text-slate-400">
+                ✗ 数字が入っている
+              </div>
+              <div id="checkSym" class="text-[11px] p-2 rounded text-center border bg-slate-800 border-slate-700 text-slate-400">
+                ✗ 記号（!@#等）
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: 安全クイズ ================= -->
+    <section id="tabQuiz" class="hidden space-y-6">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg">
+        <div id="quizActiveBox" class="space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="help-circle" class="w-6 h-6 text-emerald-400"></i>
+              <h2 class="text-lg font-bold text-white">情報セキュリティクイズ</h2>
+            </div>
+            <span id="quizProgress" class="text-xs bg-slate-700 text-slate-300 px-3 py-1 rounded-full font-bold">
+              問 1 / 3
+            </span>
+          </div>
+
+          <h3 id="quizQuestion" class="text-base sm:text-lg font-bold text-slate-100 leading-snug">
+            クイズ問題
+          </h3>
+
+          <div id="quizOptions" class="space-y-2.5">
+            <!-- JSで選択肢ボタンを動的挿入 -->
+          </div>
+
+          <div id="quizExplanationBox" class="hidden p-4 rounded-xl border bg-slate-900 border-slate-700 space-y-3 animate-fade-in">
+            <p id="quizExplanationText" class="text-xs sm:text-sm text-slate-200 font-bold leading-relaxed">
+              解説コメント
+            </p>
+            <button
+              onclick="nextQuizQuestion()"
+              class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs sm:text-sm transition flex items-center justify-center space-x-1"
+            >
+              <span id="nextQuizBtnText">次の問題へ</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- クイズ完了画面 -->
+        <div id="quizFinishBox" class="hidden text-center space-y-6 py-6">
+          <i data-lucide="award" class="w-16 h-16 text-amber-400 mx-auto animate-bounce"></i>
+          <div class="space-y-2">
+            <h3 class="text-2xl font-extrabold text-white">クイズ終了！</h3>
+            <p class="text-slate-300 text-sm">
+              あなたのスコア: <span id="quizScoreText" class="text-amber-400 font-extrabold text-2xl">0</span> / 3 問正解！
+            </p>
+          </div>
+
+          <p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            生年月日や名前を使ったパスワードの危険性がしっかり理解できましたね！<br />
+            これからも安全なパスワード作りを心がけましょう。
+          </p>
+
+          <button
+            onclick="resetQuiz()"
+            class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition shadow-lg"
+          >
+            もう一度挑戦する
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 4: 授業のまとめ ================= -->
+    <section id="tabSummary" class="hidden space-y-6">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 sm:p-6 shadow-lg space-y-6">
+        <div class="flex items-center space-x-2 border-b border-slate-700 pb-3">
+          <i data-lucide="book-open" class="w-6 h-6 text-purple-400"></i>
+          <h2 class="text-lg sm:text-xl font-bold text-white">
+            授業のまとめ：安全なパスワード作りの3つのルール
+          </h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- ルール 1 -->
+          <div class="bg-slate-900/80 border border-slate-700 rounded-xl p-4 space-y-2">
+            <div class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 font-extrabold flex items-center justify-center text-sm border border-red-500/30">
+              1
+            </div>
+            <h3 class="font-bold text-sm text-red-300">
+              自分や家族の情報を使わない！
+            </h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              苗字、名前、誕生日、電話番号、好きなアニメのキャラクターなど、推測されやすい言葉はハッカーや身近な人に見破られます。
+            </p>
+          </div>
+
+          <!-- ルール 2 -->
+          <div class="bg-slate-900/80 border border-slate-700 rounded-xl p-4 space-y-2">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 font-extrabold flex items-center justify-center text-sm border border-amber-500/30">
+              2
+            </div>
+            <h3 class="font-bold text-sm text-amber-300">
+              12文字以上 ＋ 種類を混ぜる！
+            </h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              文字数が長ければ長いほど解読時間が何万年にも伸びます！「英語の大文字・小文字・数字・記号」を必ず混ぜましょう。
+            </p>
+          </div>
+
+          <!-- ルール 3 -->
+          <div class="bg-slate-900/80 border border-slate-700 rounded-xl p-4 space-y-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold flex items-center justify-center text-sm border border-emerald-500/30">
+              3
+            </div>
+            <h3 class="font-bold text-sm text-emerald-300">
+              使い回さず、誰にも教えない！
+            </h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              同じパスワードをいろいろなアプリで使い回すと、1つ破られた時に全部盗まれます！友達にも絶対に教えないでおこう。
+            </p>
+          </div>
+        </div>
+
+        <!-- 先生・児童向けのコツカード -->
+        <div class="bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-500/30 rounded-xl p-4 text-slate-200 space-y-2">
+          <h4 class="font-bold text-xs sm:text-sm text-purple-300 flex items-center space-x-1.5">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+            <span>おすすめ！覚えやすくて安全なパスワードの作り方「合言葉作戦」</span>
+          </h4>
+          <p class="text-xs leading-relaxed text-slate-300">
+            好きな単語を2つ組み合わせて、間に記号や数字をはさむ方法がおすすめです！<br />
+            例：<span class="font-mono bg-slate-900 px-2 py-0.5 rounded text-amber-300 font-bold">Choco!2026Ramen</span> （チョコ ＋ !2026 ＋ ラーメン）<br />
+            ➔ これなら忘れにくく、解読には何億年もかかります！
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- JavaScript アプリケーションロジック -->
+  <script>
+    // --- アプリ全体の状態（State） ---
+    const state = {
+      activeTab: 'demo',
+      soundEnabled: true,
+      lastName: 'yamada',
+      firstName: 'taro',
+      birthYear: '2014',
+      birthMonth: '05',
+      birthDay: '12',
+      patternSequence: ['lastName', 'firstName', 'birthMonth', 'birthDay'],
+      isHacking: false,
+      showPass: true,
+      quizIndex: 0,
+      selectedAnswer: null,
+      score: 0,
+      quizFinished: false
+    };
+
+    // クイズデータ
+    const quizData = [
+      {
+        question: '【問1】次のうち、一番危険なパスワードはどれでしょう？',
+        options: [
+          { text: '自分の名前と誕生日（例: taro0512）', correct: true, reason: '大正解！名前や誕生日は友達やハッカーにすぐ予測されてしまいます！' },
+          { text: '大文字・小文字・記号をまぜた12桁（例: K#9mP$2vL1qZ）', correct: false, reason: 'これはとても安全なパスワードです！' },
+          { text: '好きな言葉と記号をあわせた10桁（例: Choco!98765）', correct: false, reason: '名前や誕生日よりはずっと安全です。' }
+        ]
+      },
+      {
+        question: '【問2】苗字と名前の順番をひっくり返したり（例: 0512yamadataro）、月日を前にした場合はどうなる？',
+        options: [
+          { text: '順番を変えたから、ハッカーにも見破られない！', correct: false, reason: 'ハッカーはコンピューターで全パターンの並び替えを同時に試します！' },
+          { text: 'コンピューターが全パターンを一瞬で計算するため、すぐ破られる！', correct: true, reason: '大正解！並び順を変えるだけではコンピューターの計算速度に対抗できません。' },
+          { text: '半分くらいの時間で解読される', correct: false, reason: '数ミリ秒しか違わないため、一瞬で解読されてしまいます！' }
+        ]
+      },
+      {
+        question: '【問3】安全なパスワードを作るための「一番良い工夫」はどれ？',
+        options: [
+          { text: '数字だけで4桁にする（例: 7777）', correct: false, reason: '数字だけ＆短いものは数ミリ秒で破られます。' },
+          { text: '12文字以上で、英語の大文字・小文字・数字・記号を混ぜる', correct: true, reason: '大正解！文字数を長くして種類を増やすと、解読に何万年もかかるようになります！' },
+          { text: '忘れないように、紙に書いて机の上の見える場所に貼っておく', correct: false, reason: '人に見られたら意味がありません！管理の仕方も大切です。' }
+        ]
+      }
+    ];
+
+    // Web Audio API による効果音生成
+    function playSound(type) {
+      if (!state.soundEnabled) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+
+        if (type === 'click') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(400, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.05);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.05);
+        } else if (type === 'hack') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(150, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.3);
+        } else if (type === 'success') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.08 + 0.2);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.08);
+            osc.stop(ctx.currentTime + idx * 0.08 + 0.2);
+          });
+        }
+      } catch (e) {
+        // 音声再生不可のブラウザ制限対応
+      }
+    }
+
+    // --- 各パーツ辞書 ---
+    function getBlockDict() {
+      const lName = state.lastName.trim().toLowerCase() || 'yamada';
+      const fName = state.firstName.trim().toLowerCase() || 'taro';
+      const y = state.birthYear || '2014';
+      const m = state.birthMonth.padStart(2, '0');
+      const d = state.birthDay.padStart(2, '0');
+
+      return {
+        lastName: { label: '苗字', val: lName, color: 'bg-indigo-950 border-indigo-500 text-indigo-200' },
+        firstName: { label: '名前', val: fName, color: 'bg-emerald-950 border-emerald-500 text-emerald-200' },
+        birthYear: { label: '生まれ年', val: y, color: 'bg-amber-950 border-amber-500 text-amber-200' },
+        birthMonth: { label: '誕生月', val: m, color: 'bg-purple-950 border-purple-500 text-purple-200' },
+        birthDay: { label: '誕生日', val: d, color: 'bg-pink-950 border-pink-500 text-pink-200' }
+      };
+    }
+
+    // パスワードターゲット値の計算
+    function getTargetPassword() {
+      if (state.patternSequence.length === 0) return 'yamadataro0512';
+      const dict = getBlockDict();
+      return state.patternSequence.map(key => dict[key] ? dict[key].val : '').join('');
+    }
+
+    // --- タブ切り替え機能 ---
+    function switchTab(tabName) {
+      playSound('click');
+      state.activeTab = tabName;
+
+      const tabs = ['demo', 'checker', 'quiz', 'summary'];
+      tabs.forEach(t => {
+        const section = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+
+        if (t === tabName) {
+          section.classList.remove('hidden');
+          btn.className = 'flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all text-white shadow-lg ring-2 ';
+          if (t === 'demo') btn.className += 'bg-gradient-to-r from-red-600 to-amber-600 ring-red-400 shadow-red-900/30';
+          if (t === 'checker') btn.className += 'bg-gradient-to-r from-indigo-600 to-blue-600 ring-indigo-400 shadow-indigo-900/30';
+          if (t === 'quiz') btn.className += 'bg-gradient-to-r from-emerald-600 to-teal-600 ring-emerald-400 shadow-emerald-900/30';
+          if (t === 'summary') btn.className += 'bg-gradient-to-r from-purple-600 to-pink-600 ring-purple-400 shadow-purple-900/30';
+        } else {
+          section.classList.add('hidden');
+          btn.className = 'flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700';
+        }
+      });
+      lucide.createIcons();
+    }
+
+    // サウンド切り替えボタン設定
+    document.getElementById('soundToggleBtn').addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      const soundText = document.getElementById('soundText');
+      const soundIcon = document.getElementById('soundIcon');
+      soundText.innerText = `効果音 ${state.soundEnabled ? 'ON' : 'OFF'}`;
+      soundIcon.setAttribute('data-lucide', state.soundEnabled ? 'volume-2' : 'volume-x');
+      soundIcon.className = state.soundEnabled ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-slate-400';
+      lucide.createIcons();
+    });
+
+    // --- 実験1: 並び替えブロックレンダリング ---
+    function renderBlocksUI() {
+      const dict = getBlockDict();
+      const container = document.getElementById('sequenceContainer');
+      container.innerHTML = '';
+
+      if (state.patternSequence.length === 0) {
+        container.innerHTML = '<span class="text-xs text-slate-500 italic">下のパーツをタップして追加してね</span>';
+      } else {
+        state.patternSequence.forEach((key, idx) => {
+          const item = dict[key];
+          const div = document.createElement('div');
+          div.className = `flex items-center space-x-1 px-2 py-1 rounded border text-xs font-bold ${item.color} shadow`;
+          
+          let leftBtn = idx > 0 ? `<button onclick="moveBlock(${idx}, -1)" class="hover:bg-white/20 rounded p-0.5" title="左へ移動">←</button>` : '';
+          let rightBtn = idx < state.patternSequence.length - 1 ? `<button onclick="moveBlock(${idx}, 1)" class="hover:bg-white/20 rounded p-0.5" title="右へ移動">→</button>` : '';
+
+          div.innerHTML = `
+            <span>${item.label}</span>
+            <span class="font-mono text-[10px] bg-black/40 px-1 rounded text-white">${item.val}</span>
+            <div class="flex items-center space-x-0.5 ml-1 border-l border-white/20 pl-1">
+              ${leftBtn}
+              ${rightBtn}
+              <button onclick="removeBlock(${idx})" class="hover:bg-red-500/40 text-red-300 rounded p-0.5" title="削除">✕</button>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      // 未使用ブロックレンダリング
+      const unusedContainer = document.getElementById('unusedBlocksContainer');
+      unusedContainer.innerHTML = '';
+      Object.keys(dict).forEach(key => {
+        if (!state.patternSequence.includes(key)) {
+          const btn = document.createElement('button');
+          btn.onclick = () => addBlock(key);
+          btn.className = 'flex items-center space-x-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-600 transition';
+          btn.innerHTML = `<span class="text-emerald-400">+</span><span>${dict[key].label}</span>`;
+          unusedContainer.appendChild(btn);
+        }
+      });
+
+      // ターゲットパスワード表示更新
+      document.getElementById('targetPassDisplay').innerText = getTargetPassword();
+    }
+
+    function addBlock(key) {
+      playSound('click');
+      if (!state.patternSequence.includes(key)) {
+        state.patternSequence.push(key);
+        renderBlocksUI();
+      }
+    }
+
+    function removeBlock(index) {
+      playSound('click');
+      state.patternSequence.splice(index, 1);
+      renderBlocksUI();
+    }
+
+    function moveBlock(index, direction) {
+      playSound('click');
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= state.patternSequence.length) return;
+      const temp = state.patternSequence[index];
+      state.patternSequence[index] = state.patternSequence[targetIndex];
+      state.patternSequence[targetIndex] = temp;
+      renderBlocksUI();
+    }
+
+    function setPreset(seq) {
+      playSound('click');
+      state.patternSequence = [...seq];
+      renderBlocksUI();
+    }
+
+    // ドロップダウン＆テキスト入力イベント
+    ['LastName', 'FirstName'].forEach(id => {
+      document.getElementById('input' + id).addEventListener('input', (e) => {
+        state[id.charAt(0).toLowerCase() + id.slice(1)] = e.target.value;
+        renderBlocksUI();
+      });
+    });
+
+    // 年月日ドロップダウン生成
+    const selectYear = document.getElementById('selectBirthYear');
+    for (let i = 2010; i <= 2020; i++) {
+      const opt = document.createElement('option');
+      opt.value = i.toString();
+      opt.innerText = `${i}年`;
+      if (i === 2014) opt.selected = true;
+      selectYear.appendChild(opt);
+    }
+    selectYear.addEventListener('change', (e) => { state.birthYear = e.target.value; renderBlocksUI(); });
+
+    const selectMonth = document.getElementById('selectBirthMonth');
+    for (let i = 1; i <= 12; i++) {
+      const opt = document.createElement('option');
+      const val = i.toString().padStart(2, '0');
+      opt.value = val;
+      opt.innerText = `${i}月`;
+      if (i === 5) opt.selected = true;
+      selectMonth.appendChild(opt);
+    }
+    selectMonth.addEventListener('change', (e) => { state.birthMonth = e.target.value; renderBlocksUI(); });
+
+    const selectDay = document.getElementById('selectBirthDay');
+    for (let i = 1; i <= 31; i++) {
+      const opt = document.createElement('option');
+      const val = i.toString().padStart(2, '0');
+      opt.value = val;
+      opt.innerText = `${i}日`;
+      if (i === 12) opt.selected = true;
+      selectDay.appendChild(opt);
+    }
+    selectDay.addEventListener('change', (e) => { state.birthDay = e.target.value; renderBlocksUI(); });
+
+    // --- 疑似ハッキング実行処理 ---
+    function startHackingExperiment() {
+      playSound('click');
+      state.isHacking = true;
+      
+      const startBtn = document.getElementById('startHackBtn');
+      const btnText = document.getElementById('startHackBtnText');
+      startBtn.disabled = true;
+      btnText.innerText = '候補を順番に表示中...';
+
+      const terminalLogs = document.getElementById('terminalLogs');
+      const terminalStatus = document.getElementById('terminalStatus');
+      const hackResultCard = document.getElementById('hackResultCard');
+      const progressBar = document.getElementById('terminalProgressBar');
+      const progressText = document.getElementById('terminalProgressText');
+      const progressPercent = document.getElementById('terminalProgressPercent');
+
+      terminalStatus.innerText = 'SIMULATION: RUNNING...';
+      progressBar.style.width = '0%';
+      progressText.innerText = '候補を確認中...';
+      progressPercent.innerText = '0%';
+      hackResultCard.classList.add('hidden');
+      terminalLogs.innerHTML = `
+        <p class="text-slate-500">// 授業用シミュレーションを開始</p>
+        <p class="text-slate-500">// あらかじめ用意した候補を順番に確認しています...</p>
+      `;
+
+      const dict = getBlockDict();
+      const lName = dict.lastName.val;
+      const fName = dict.firstName.val;
+      const y = dict.birthYear.val;
+      const m = dict.birthMonth.val;
+      const d = dict.birthDay.val;
+      const targetPass = getTargetPassword();
+
+      const possibleCombinations = [
+        '12345678', 'password', `${lName}`, `${fName}`, `${lName}${fName}`, `${fName}${lName}`,
+        `${d}${m}${y}${fName}${lName}`, `${y}${m}${d}${lName}${fName}`, `${fName}${y}${m}${d}`,
+        `${m}${d}${lName}${fName}`, `${lName}${fName}${m}${d}`, `${fName}${lName}${m}${d}`,
+        `${d}${m}${fName}`, `${d}${m}${y}${lName}`, targetPass
+      ];
+
+      const mockTries = Array.from(new Set(possibleCombinations));
+      let step = 0;
+      // 教材デモの演出用カウント。実際の解析・試行回数ではありません。
+      let simulatedAttempts = Math.floor(Math.random() * 17000) + 3000;
+      // 文字数に応じてデモの再生時間だけを変化させる（実際の解析時間を推定するものではありません）。
+      const simulatedDurationMs = Math.min(8000, 900 + Math.max(0, targetPass.length - 6) * 280);
+      const intervalMs = simulatedDurationMs / mockTries.length;
+
+      const interval = setInterval(() => {
+        if (step < mockTries.length) {
+          const currentTry = mockTries[step];
+          const isMatch = currentTry === targetPass;
+          const progress = Math.round(((step + 1) / mockTries.length) * 100);
+          simulatedAttempts += Math.floor(Math.random() * 10500) + 1500;
+
+          const logLine = document.createElement('p');
+          logLine.className = isMatch ? 'text-emerald-200 font-mono font-bold' : 'text-emerald-500/80 font-mono';
+          logLine.innerText = `[演出カウント ${simulatedAttempts.toLocaleString()} / 候補 ${String(step + 1).padStart(2, '0')}] ${currentTry} ${isMatch ? '★ 一致！' : '— 不一致'}`;
+          terminalLogs.appendChild(logLine);
+          terminalLogs.scrollTop = terminalLogs.scrollHeight;
+          progressBar.style.width = `${progress}%`;
+          progressText.innerText = isMatch ? '一致する候補が見つかりました' : '候補を確認中...';
+          progressPercent.innerText = `${progress}%`;
+
+          playSound('click');
+
+          if (isMatch) {
+            clearInterval(interval);
+            state.isHacking = false;
+            startBtn.disabled = false;
+            btnText.innerText = '解析シミュレーションを開始';
+            terminalStatus.innerText = 'SIMULATION: MATCH FOUND!';
+
+            playSound('hack');
+
+            const displayedDuration = (((step + 1) / mockTries.length) * simulatedDurationMs / 1000).toFixed(1);
+            document.getElementById('resultDemoTime').innerText = `約 ${displayedDuration} 秒（演出）`;
+            document.getElementById('resultAttempts').innerText = `約 ${simulatedAttempts.toLocaleString()} 回（演出）`;
+            document.getElementById('resultReason').innerHTML = `
+              【シミュレーション結果】<br />
+              このデモは授業用に用意した候補を表示しています。演出時間は入力の文字数に応じて長くしていますが、実際の解析時間や安全性を表すものではありません。表示回数も演出用です。名前や誕生日など推測されやすい情報を使うと危険だということを学びましょう。
+            `;
+            hackResultCard.classList.remove('hidden');
+          }
+          step++;
+        } else {
+          clearInterval(interval);
+          state.isHacking = false;
+          startBtn.disabled = false;
+          btnText.innerText = '解析シミュレーションを開始';
+          terminalStatus.innerText = 'SIMULATION: FINISHED';
+          progressText.innerText = 'シミュレーション完了';
+          progressPercent.innerText = '100%';
+          progressBar.style.width = '100%';
+        }
+      }, intervalMs);
+    }
+
+    // --- 実験2: 安全度測定器ロジック ---
+    function togglePassVisibility() {
+      state.showPass = !state.showPass;
+      const input = document.getElementById('customPasswordInput');
+      const eyeIcon = document.getElementById('eyeIcon');
+      input.type = state.showPass ? 'text' : 'password';
+      eyeIcon.setAttribute('data-lucide', state.showPass ? 'eye-off' : 'eye');
+      lucide.createIcons();
+    }
+
+    function generateStrongPassword() {
+      playSound('click');
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+      let res = '';
+      for (let i = 0; i < 12; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const input = document.getElementById('customPasswordInput');
+      input.value = res;
+      updateStrengthMeter();
+    }
+
+    function updateStrengthMeter() {
+      const pass = document.getElementById('customPasswordInput').value;
+      const resultArea = document.getElementById('strengthResultArea');
+
+      if (!pass) {
+        resultArea.classList.add('hidden');
+        return;
+      }
+
+      resultArea.classList.remove('hidden');
+
+      const length = pass.length;
+      const hasLower = /[a-z]/.test(pass);
+      const hasUpper = /[A-Z]/.test(pass);
+      const hasDigit = /[0-9]/.test(pass);
+      const hasSymbol = /[^a-zA-Z0-9]/.test(pass);
+
+      let charsetSize = 0;
+      if (hasLower) charsetSize += 26;
+      if (hasUpper) charsetSize += 26;
+      if (hasDigit) charsetSize += 10;
+      if (hasSymbol) charsetSize += 32;
+
+      const isWeakPattern = /taro|hanako|yamada|satou|1234|2010|2011|2012|2013|2014|2015|0101|1225/i.test(pass);
+      const combinations = Math.pow(charsetSize || 1, length);
+      const guessesPerSecond = 10000000000;
+      let seconds = combinations / guessesPerSecond;
+
+      if (isWeakPattern && length < 12) seconds = 0.001;
+
+      let level = 1, color = 'bg-red-500', timeText = '0.001秒（一瞬！）', analogy = '電気のスイッチを押した瞬間に解読されるレベルです。', desc = 'とても危険！名前や誕生日、簡単すぎる言葉はハッカーに一瞬で見破られます。', badgeBg = 'bg-red-900/40 border-red-500/50 text-red-300';
+
+      if (seconds >= 0.01 && seconds < 60) {
+        level = 2; color = 'bg-orange-500'; timeText = `${Math.ceil(seconds)}秒くらい`; analogy = '手洗いうがいをしている間に解読されてしまいます。'; desc = 'まだまだ危険！短いパスワードはコンピューターならすぐ解けます。'; badgeBg = 'bg-orange-900/40 border-orange-500/50 text-orange-300';
+      } else if (seconds >= 60 && seconds < 3600) {
+        level = 3; color = 'bg-yellow-500'; timeText = `約 ${Math.ceil(seconds / 60)} 分`; analogy = 'カップラーメンを待っている間に解読されてしまいます。'; desc = '少しだけ強くなったけど、まだ安心できません。'; badgeBg = 'bg-yellow-900/40 border-yellow-500/50 text-yellow-300';
+      } else if (seconds >= 3600 && seconds < 86400 * 30) {
+        level = 4; color = 'bg-blue-500'; timeText = `約 ${Math.ceil(seconds / 3600)} 時間`; analogy = 'きょうの宿題が終わるくらいまで持ちこたえられます。'; desc = 'かなり強くなりました！もう少し文字数を増やすと完璧！'; badgeBg = 'bg-blue-900/40 border-blue-500/50 text-blue-300';
+      } else if (seconds >= 86400 * 30 && seconds < 86400 * 365 * 100) {
+        level = 5; color = 'bg-emerald-500'; timeText = `約 ${Math.ceil(seconds / (86400 * 365))} 年`; analogy = '君がおじいちゃん・おばあちゃんになるまで解読できません！'; desc = 'とても安全！人間の一生を超える時間がかかります。'; badgeBg = 'bg-emerald-900/40 border-emerald-500/50 text-emerald-300';
+      } else if (seconds >= 86400 * 365 * 100) {
+        level = 6; color = 'bg-purple-500'; timeText = '数億年〜数兆年（宇宙の歴史より長い！）'; analogy = '恐竜がいた時代から今まで計算し続けても解けません！'; desc = '最強のパスワード！ハッカーも絶対にあきらめます！'; badgeBg = 'bg-purple-900/40 border-purple-500/50 text-purple-300';
+      }
+
+      document.getElementById('strengthLevelText').innerText = `レベル ${level} / 6`;
+      const bar = document.getElementById('strengthBar');
+      bar.className = `h-full rounded-full transition-all duration-500 ${color}`;
+      bar.style.width = `${(level / 6) * 100}%`;
+
+      document.getElementById('crackTimeDisplay').innerText = timeText;
+      const analogyBadge = document.getElementById('analogyBadge');
+      analogyBadge.className = `px-3 py-2 rounded-lg border text-xs font-bold text-center ${badgeBg}`;
+      analogyBadge.innerText = analogy;
+      document.getElementById('strengthDesc').innerText = desc;
+
+      // チェックリスト状態の更新
+      updateCheckItem('checkLen', length >= 12, '12文字以上');
+      updateCheckItem('checkCase', hasLower && hasUpper, '大文字＋小文字');
+      updateCheckItem('checkNum', hasDigit, '数字が入っている');
+      updateCheckItem('checkSym', hasSymbol, '記号（!@#等）');
+    }
+
+    function updateCheckItem(id, passed, labelText) {
+      const el = document.getElementById(id);
+      if (passed) {
+        el.className = 'text-[11px] p-2 rounded text-center border bg-emerald-950/40 border-emerald-500/40 text-emerald-300';
+        el.innerText = `✓ ${labelText} (合格)`;
+      } else {
+        el.className = 'text-[11px] p-2 rounded text-center border bg-slate-800 border-slate-700 text-slate-400';
+        el.innerText = `✗ ${labelText}`;
+      }
+    }
+
+    // --- 実験3: クイズ機能 ---
+    function renderQuiz() {
+      const q = quizData[state.quizIndex];
+      document.getElementById('quizProgress').innerText = `問 ${state.quizIndex + 1} / ${quizData.length}`;
+      document.getElementById('quizQuestion').innerText = q.question;
+
+      const container = document.getElementById('quizOptions');
+      container.innerHTML = '';
+
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between text-xs sm:text-sm font-medium bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200';
+        btn.onclick = () => selectQuizOption(opt, btn);
+        btn.innerHTML = `<span>${opt.text}</span><span id="optIcon${idx}"></span>`;
+        container.appendChild(btn);
+      });
+
+      document.getElementById('quizExplanationBox').classList.add('hidden');
+    }
+
+    function selectQuizOption(option, btnElement) {
+      if (state.selectedAnswer) return;
+      state.selectedAnswer = option;
+
+      playSound(option.correct ? 'success' : 'hack');
+      if (option.correct) state.score++;
+
+      btnElement.className = `w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between text-xs sm:text-sm font-bold ${
+        option.correct ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200' : 'bg-red-950/80 border-red-500 text-red-200'
+      }`;
+
+      document.getElementById('quizExplanationText').innerText = option.reason;
+      document.getElementById('quizExplanationBox').classList.remove('hidden');
+      document.getElementById('nextQuizBtnText').innerText = state.quizIndex + 1 < quizData.length ? '次の問題へ' : '結果を見る';
+    }
+
+    function nextQuizQuestion() {
+      playSound('click');
+      if (state.quizIndex + 1 < quizData.length) {
+        state.quizIndex++;
+        state.selectedAnswer = null;
+        renderQuiz();
+      } else {
+        document.getElementById('quizActiveBox').classList.add('hidden');
+        document.getElementById('quizFinishBox').classList.remove('hidden');
+        document.getElementById('quizScoreText').innerText = state.score;
+      }
+    }
+
+    function resetQuiz() {
+      playSound('click');
+      state.quizIndex = 0;
+      state.selectedAnswer = null;
+      state.score = 0;
+      document.getElementById('quizActiveBox').classList.remove('hidden');
+      document.getElementById('quizFinishBox').classList.add('hidden');
+      renderQuiz();
+    }
+
+    // --- 初期ロード時の初期化処理 ---
+    window.onload = function() {
+      renderBlocksUI();
+      renderQuiz();
+      lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
